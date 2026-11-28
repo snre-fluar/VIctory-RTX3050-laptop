@@ -27,6 +27,8 @@
 /captures/
 /out/
 *.log
+/amd-sdk/
+/nvidia-sdk/
 
 # Executables, libraries, symbols
 *.exe

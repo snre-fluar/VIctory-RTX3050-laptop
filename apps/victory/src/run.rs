@@ -53,15 +53,44 @@ pub fn run(
     // A title that relaunched itself: the old process must be gone first.
     victory_hle::modules::lifecycle::wait_for_previous();
     let cfg = victory_core::Config::load()?;
+    let mut asked = victory_hle::streamline::Asked::from_env().map_err(anyhow::Error::msg)?;
+    asked.series_s = matches!(console, Console::SeriesS);
+    let available = victory_hle::streamline::init(&asked);
+    let fsr_path = std::env::var_os("VICTORY_FSR_PATH").is_some_and(|v| v == "1");
+    let upscaler = (available.dlss || available.framegen || available.fsr_framegen || fsr_path).then_some(asked.mode);
+    for (i, line) in victory_hle::streamline::notice_at_start().iter().enumerate() {
+        println!("{}{line}", if i == 0 { "frame gen      " } else { "               " });
+    }
+    if asked.any() {
+        println!(
+            "upscaling      DLSS {}, frame generation {}{}",
+            if available.dlss { "on" } else if asked.dlss { "asked, not available" } else { "off" },
+            if available.framegen || available.fsr_framegen { "on" } else if asked.framegen || asked.fsr_framegen { "asked, not available" } else { "off" },
+            upscaler.map(|m| format!(", scene at the {} scale ({})", m.name(), m.scale())).unwrap_or_default()
+        );
+    }
     let original = std::fs::read(exe).with_context(|| format!("reading {}", exe.display()))?;
-    let prepared = victory_loader::prepare(&original)?;
+    let mut prepared = victory_loader::prepare(&original)?;
     let hash = prepared.original_hash.to_hex();
     match victory_game::identify(&hash) {
         Some(build) => println!("build          {} ({hash})", build.label),
         None => println!("build          unknown ({hash})"),
     }
 
-    let images = cfg.cache_subdir("images")?;
+    let images = if let Some(mode) = upscaler {
+        match crate::native_1440p::prepare_upscaler(&mut prepared, mode) {
+            Ok(()) => {
+                println!("display        the title's output, scene at {} of it through its FidelityFX path ({})", mode.scale(), mode.name());
+                cfg.cache_subdir(&format!("images/upscaler-{}", mode.name()))?
+            }
+            Err(e) => {
+                println!("upscaling      the title's FidelityFX path was not patched in: {e:#}");
+                cfg.cache_subdir("images")?
+            }
+        }
+    } else {
+        cfg.cache_subdir("images")?
+    };
     victory_hle::modules::d3d12x::use_shader_cache(cfg.cache_subdir("shaders")?);
     let image = victory_loader::load(&prepared, &images)?;
     // The program is mapped from the copy `load` wrote: the file's bytes
@@ -162,7 +191,8 @@ pub fn run(
         show(name, dll.bind_imports(&with_dlls, policy)?);
     }
     let exe_name = exe.file_name().unwrap_or_default().to_string_lossy();
-    show(&exe_name, image.bind_imports(&with_dlls, policy)?);
+    let interposed = victory_hle::modules::fidelityfx::Interpose { inner: &with_dlls };
+    show(&exe_name, image.bind_imports(&interposed, policy)?);
     if execute {
         let size = image.info().size_of_image as usize;
         // SAFETY: the image stays mapped, and nothing of it has run yet.

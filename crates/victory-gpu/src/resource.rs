@@ -1458,6 +1458,11 @@ static TARGETS_AT: std::sync::Mutex<std::collections::BTreeMap<u64, usize>> =
 /// one layer were found at first, and the programs behind the others read
 /// the title's unwritten memory - the sky light cache's second stage wrote
 /// all zeros from a first stage that held light (run 88).
+#[cfg(windows)]
+pub(crate) fn is_aliased(this: This) -> bool {
+    alias_of(this).is_some()
+}
+
 /// `VICTORY_ALIAS_COPY=0`: none is found, as before; `=1`: only textures
 /// of one level and one layer, as at first.
 #[cfg(windows)]

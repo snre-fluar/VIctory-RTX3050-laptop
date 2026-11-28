@@ -187,6 +187,39 @@ pub(crate) fn host_list<'a>(this: This) -> Option<&'a crate::host::HostList> {
     unsafe { (*this.cast::<List>()).host.as_ref() }
 }
 
+/// Work of ours recorded at a place in a title command list.
+#[cfg(windows)]
+pub(crate) type External = Box<dyn FnOnce(&crate::host::HostList) -> bool + Send>;
+
+/// Runs `work` at this place of title list `this`: now, or, with
+/// `VICTORY_THIN=1`, when the list's calls are translated (in their order).
+/// False if the list records nowhere.
+#[cfg(windows)]
+pub(crate) fn external(this: This, work: External) -> bool {
+    if this.is_null() {
+        return false;
+    }
+    let work = match thin::put_external(this, work) {
+        Ok(()) => return true,
+        Err(work) => work,
+    };
+    if host_list(this).is_none() {
+        return false;
+    }
+    run_external(this, work);
+    true
+}
+
+/// [`external`]'s work on the list that records `this`'s calls.
+#[cfg(windows)]
+fn run_external(this: This, work: External) {
+    with_state(this, |host, state| {
+        if work(host) {
+            state.replay(host);
+        }
+    });
+}
+
 /// The host side of a submitted list, taken from it: a queue that waits
 /// for a fence runs it later, and the title may reset the list meanwhile.
 /// With it go the upload memory and the dynamic descriptor slots its

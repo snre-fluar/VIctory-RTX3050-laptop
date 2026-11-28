@@ -110,9 +110,9 @@ fn next_pressure_for(was: bool, physical: u64, commit: u64, very_low: bool) -> b
         // headroom is ample; avoid throttling unless commit is low, both are
         // tight, or free physical RAM drops to critically low levels.
         if was {
-            commit < 4 * GIB || (physical < 768 * MIB && commit < 6 * GIB) || physical < 192 * MIB
+            commit < 4 * GIB || (physical < 768 * MIB && commit < 6 * GIB)
         } else {
-            commit <= 3 * GIB || (physical <= 384 * MIB && commit <= 5 * GIB) || physical <= 128 * MIB
+            commit <= 3 * GIB || (physical <= 384 * MIB && commit <= 5 * GIB)
         }
     } else if was {
         physical < 5 * GIB || commit < 6 * GIB
@@ -307,7 +307,7 @@ mod tests {
         // does not stall prefetch until critically low, and WDDM shared GPU spillover waits until 86% / 78% / 92%.
         assert!(!next_pressure_for(false, 320 * MIB, 14 * GIB, true));
         assert!(next_pressure_for(false, 384 * MIB, 5 * GIB, true));
-        assert!(next_pressure_for(false, 128 * MIB, 24 * GIB, true));
+        assert!(!next_pressure_for(false, 64 * MIB, 15 * GIB, true));
         assert!(next_pressure_for(true, 512 * MIB, 5 * GIB, true));
         assert!(!next_pressure_for(true, 768 * MIB, 6 * GIB, true));
         assert!(!next_pressure_with_shared_for(false, 4 * GIB, 24 * GIB, 1000 * MIB, 750 * MIB, true));

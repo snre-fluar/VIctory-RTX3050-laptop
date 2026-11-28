@@ -84,7 +84,11 @@ mod memory;
 mod shadow;
 #[cfg(windows)]
 mod tiles;
+#[cfg(windows)]
+mod external;
 pub mod signature;
+#[cfg(windows)]
+pub mod streamline;
 mod switch;
 #[cfg(all(windows, feature = "diagnostics"))]
 mod ab;

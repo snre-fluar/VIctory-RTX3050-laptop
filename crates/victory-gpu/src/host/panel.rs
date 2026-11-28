@@ -205,6 +205,14 @@ impl Counters {
     }
 }
 
+/// The frame generation line: `per` frames shown for each one rendered.
+fn generated(fps: f64, per: u32) -> String {
+    match per {
+        0 | 1 => "FRAME GEN OFF".to_owned(),
+        per => format!("FRAME GEN {per}X  SHOWN {:.1} FPS", fps * f64::from(per)),
+    }
+}
+
 /// The text. `c`: [`Counters`] per frame, `ms` a frame's time, `worst` the
 /// longest frame's, `cost` what this takes of a frame, in microseconds.
 fn text(c: &[f64; COUNTERS], ms: f64, worst: f64, cost: f64, host: &Host) -> Vec<String> {
@@ -212,8 +220,10 @@ fn text(c: &[f64; COUNTERS], ms: f64, worst: f64, cost: f64, host: &Host) -> Vec
     let (working, private) = crate::copystat::process_memory();
     let [budget, used, _, shared] = host.video_memory().unwrap_or_default();
     let idle = (c[1] / 1e3).min(ms);
+    let fps = 1e3 / ms.max(0.001);
     vec![
-        format!("FPS {:.1}  FRAME {ms:.1} MS  LONGEST {worst:.0}", 1e3 / ms.max(0.001)),
+        format!("FPS {fps:.1}  FRAME {ms:.1} MS  LONGEST {worst:.0}"),
+        generated(fps, crate::streamline::shown_per_frame()),
         format!("DRAWS {:.0}  DROPPED {:.0}", c[10], c[8]),
         format!("SUBMIT BUSY {:.1}  WAITS FOR GPU {:.1}", c[0] / 1e3, c[3] / 1e3),
         format!("GPU BUSY {:.1}  IDLE BEHIND US {:.1}", ms - idle, c[2] / 1e3),

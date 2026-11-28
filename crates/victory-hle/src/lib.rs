@@ -25,6 +25,8 @@ pub use registry::{HleExport, HleModule, registry};
 pub use victory_gpu::console;
 #[cfg(all(windows, feature = "diagnostics"))]
 pub use victory_gpu::replay;
+#[cfg(windows)]
+pub use victory_gpu::streamline;
 
 #[cfg(windows)]
 pub use victory_gpu::pipeline::known as known_pipelines;

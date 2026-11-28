@@ -67,6 +67,39 @@ fn software(desc: &DXGI_ADAPTER_DESC1) -> bool {
         || (desc.VendorId == 0x1414 && desc.DeviceId == 0x8c)
 }
 
+/// Returns the first non-software DXGI adapter matching `VICTORY_ADAPTER` or
+/// `VICTORY_D3D12_ADAPTER` (or the first hardware adapter), its name, and its
+/// dedicated video memory in bytes.
+pub fn hardware_adapter() -> Option<(IDXGIAdapter1, String, u64)> {
+    let requested = std::env::var("VICTORY_ADAPTER")
+        .or_else(|_| std::env::var("VICTORY_D3D12_ADAPTER"))
+        .ok();
+    // SAFETY: plain DXGI adapter queries.
+    unsafe {
+        let factory: IDXGIFactory1 = CreateDXGIFactory1().ok()?;
+        let mut first = None;
+        for i in 0.. {
+            let Ok(adapter) = factory.EnumAdapters1(i) else { break };
+            let Ok(desc) = adapter.GetDesc1() else { continue };
+            if desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0 {
+                continue;
+            }
+            let len = desc.Description.iter().position(|&c| c == 0).unwrap_or(desc.Description.len());
+            let name = String::from_utf16_lossy(&desc.Description[..len]);
+            let mem = desc.DedicatedVideoMemory as u64;
+            if let Some(req) = requested.as_deref() {
+                if adapter_matches(req, i, &name) {
+                    return Some((adapter, name, mem));
+                }
+            }
+            if first.is_none() {
+                first = Some((adapter, name, mem));
+            }
+        }
+        first
+    }
+}
+
 fn adapter_matches(requested: &str, index: u32, name: &str) -> bool {
     if let Ok(wanted) = requested.parse::<u32>() {
         wanted == index
